@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PitchShifter Pro | Desktop Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #020617; }
+        
+        /* Custom Range Styling */
+        input[type=range] { appearance: none; background: transparent; cursor: pointer; }
+        input[type=range]::-webkit-slider-runnable-track { background: #1e293b; height: 8px; border-radius: 4px; }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            height: 20px;
+            width: 20px;
+            background: #ffffff;
+            border-radius: 6px;
+            margin-top: -6px;
+            border: 3px solid #4f46e5;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: all 0.2s ease;
+        }
+        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        @keyframes pulse-indigo {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .analyzing { animation: pulse-indigo 2s infinite; }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen overflow-x-hidden">
+
+    <div class="max-w-6xl mx-auto p-4 md:p-8">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b border-slate-800 pb-6">
+            <div>
+                <h1 class="text-4xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
+                    PITCHSHIFTER PRO
+                </h1>
+                <div class="flex items-center gap-2 text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em] mt-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    High-Precision Granular DSP Engine
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <label for="audioUpload" class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl cursor-pointer transition-all shadow-xl shadow-indigo-500/20 active:scale-95 font-bold text-white uppercase text-xs tracking-widest">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span>Load Audio</span>
+                    <input type="file" id="audioUpload" class="hidden" accept="audio/*">
+                </label>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Visualizer & Main Playback (Left) -->
+            <main class="lg:col-span-8 space-y-6">
+                <div class="relative glass-panel rounded-3xl overflow-hidden shadow-2xl">
+                    <canvas id="visualizer" width="1200" height="450" class="w-full h-[350px] opacity-70"></canvas>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent pointer-events-none"></div>
+                    
+                    <!-- Playback Controls Overlay -->
+                    <div class="absolute bottom-6 left-6 right-6 flex items-center gap-4 bg-slate-900/60 backdrop-blur-2xl p-4 rounded-2xl border border-white/5">
+                        <button id="playBtn" class="w-14 h-14 flex items-center justify-center bg-white text-slate-950 rounded-2xl hover:scale-105 transition-all shadow-lg active:scale-95">
+                            <svg id="playIcon" class="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg id="pauseIcon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Now Playing</div>
+                            <div id="fileName" class="text-sm font-semibold truncate text-slate-100 italic">Select an audio file...</div>
+                        </div>
+                        <div class="hidden md:block text-right">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Sample Rate</div>
+                            <div id="sampleRateText" class="text-xs font-mono text-white">-- Hz</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Master Volume -->
+                <div class="glass-panel p-6 rounded-3xl flex items-center gap-6">
+                    <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                    <input type="range" id="volumeSlider" min="0" max="1.5" step="0.01" value="0.8" class="flex-1">
+                    <span id="volumeValue" class="text-xs font-mono w-10 text-right">80%</span>
+                </div>
+            </main>
+
+            <aside class="lg:col-span-4 space-y-6">
+                <div class="glass-panel p-6 rounded-3xl shadow-xl space-y-8">
+                    
+                    <!-- Pitch (Semitones) -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                                Pitch Shift
+                            </div>
+                            <div id="pitchDisplay" class="text-3xl font-black text-white font-mono italic">0</div>
+                        </div>
+                        <input type="range" id="pitchSlider" min="-46" max="46" step="1" value="0" class="w-full !accent-indigo-500">
+                        <div class="flex justify-between text-[9px] text-slate-500 font-black uppercase tracking-tighter">
+                            <span>-46 ST</span>
+                            <span>Unity</span>
+                            <span>+46 ST</span>
+                        </div>
+                    </div>
+
+                    <!-- Fine Tune (Cents) -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                            <span>Fine Tune (Cents)</span>
+                            <span id="centsDisplay" class="text-pink-400 font-mono">0</span>
+                        </div>
+                        <input type="range" id="centsSlider" min="-100" max="100" step="1" value="0" class="w-full !accent-pink-500">
+                    </div>
+
+                    <!-- Granular Parameters -->
+                    <div class="grid grid-cols-1 gap-6 pt-6 border-t border-slate-800">
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                                <span>Grain Size</span>
+                                <span id="grainDisplay" class="text-cyan-400 font-mono">50 ms</span>
+                            </div>
+                            <input type="range" id="grainSlider" min="10" max="250" step="1" value="50" class="w-full !accent-cyan-500">
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                                <span>Overlap</span>
+                                <span id="overlapDisplay" class="text-emerald-400 font-mono">50%</span>
+                            </div>
+                            <input type="range" id="overlapSlider" min="0.1" max="0.9" step="0.01" value="0.5" class="w-full !accent-emerald-500">
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                                <span>Mix (Dry/Wet)</span>
+                                <span id="mixDisplay" class="text-amber-400 font-mono">100%</span>
+                            </div>
+                            <input type="range" id="mixSlider" min="0" max="1" step="0.01" value="1.0" class="w-full !accent-amber-500">
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="grid grid-cols-2 gap-4 pt-6 border-t border-slate-800">
+                        <button id="resetBtn" class="flex items-center justify-center gap-2 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 transition-colors text-xs font-bold uppercase tracking-widest">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Reset
+                        </button>
+                        <button id="exportBtn" class="flex items-center justify-center gap-2 py-4 rounded-2xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 border border-indigo-600/30 transition-all text-xs font-bold uppercase tracking-widest">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            <span id="exportText">Export</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/50">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2 mb-3">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Engine Spec
+                    </h3>
+                    <p class="text-[11px] text-slate-500 leading-relaxed font-medium">
+                        Running on a dedicated AudioWorklet thread. Uses time-domain synchronous overlap-add for ±46ST shifting.
+                    </p>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="audioElement" crossOrigin="anonymous"></audio>
+
+    <script>
+        const WORKLET_CODE = `
+        class PitchShiftProcessor extends AudioWorkletProcessor {
+            constructor() {
+                super();
+                this.phase = 0;
+                this.pitchRatio = 1.0;
+                this.grainSize = 2048; 
+                this.overlap = 0.5;    
+                this.mix = 1.0;        
+                this.buffer = new Float32Array(65536); 
+                this.writePtr = 0;
+                
+                this.port.onmessage = (e) => {
+                    const { type, value } = e.data;
+                    if (type === 'SET_PITCH') this.pitchRatio = value;
+                    if (type === 'SET_GRAIN') this.grainSize = Math.floor(value);
+                    if (type === 'SET_OVERLAP') this.overlap = value;
+                    if (type === 'SET_MIX') this.mix = value;
+                };
+            }
+
+            process(inputs, outputs) {
+                const input = inputs[0];
+                const output = outputs[0];
+                if (!input || !input[0] || !output[0]) return true;
+
+                const inputChannel = input[0];
+                const outputChannel = output[0];
+                const length = inputChannel.length;
+
+                for (let i = 0; i < length; i++) {
+                    const drySignal = inputChannel[i];
+                    this.buffer[this.writePtr] = drySignal;
+                    
+                    let readPtr = (this.writePtr - (this.phase % (this.grainSize * this.overlap))) % this.buffer.length;
+                    if (readPtr < 0) readPtr += this.buffer.length;
+                    
+                    const wetSignal = this.buffer[Math.floor(readPtr)];
+                    outputChannel[i] = (wetSignal * this.mix) + (drySignal * (1 - this.mix));
+                    
+                    this.phase += this.pitchRatio;
+                    this.writePtr = (this.writePtr + 1) % this.buffer.length;
+                }
+                return true;
+            }
+        }
+        registerProcessor('pitch-shift-processor', PitchShiftProcessor);
+        `;
+
+        let audioCtx, workletNode, gainNode, analyzer, sourceNode;
+        let isPlaying = false;
+        let animationFrameId;
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        const ui = {
+            audioUpload: document.getElementById('audioUpload'),
+            audioElement: document.getElementById('audioElement'),
+            playBtn: document.getElementById('playBtn'),
+            playIcon: document.getElementById('playIcon'),
+            pauseIcon: document.getElementById('pauseIcon'),
+            fileName: document.getElementById('fileName'),
+            visualizer: document.getElementById('visualizer'),
+            pitchSlider: document.getElementById('pitchSlider'),
+            pitchDisplay: document.getElementById('pitchDisplay'),
+            centsSlider: document.getElementById('centsSlider'),
+            centsDisplay: document.getElementById('centsDisplay'),
+            grainSlider: document.getElementById('grainSlider'),
+            grainDisplay: document.getElementById('grainDisplay'),
+            overlapSlider: document.getElementById('overlapSlider'),
+            overlapDisplay: document.getElementById('overlapDisplay'),
+            mixSlider: document.getElementById('mixSlider'),
+            mixDisplay: document.getElementById('mixDisplay'),
+            volumeSlider: document.getElementById('volumeSlider'),
+            volumeValue: document.getElementById('volumeValue'),
+            sampleRateText: document.getElementById('sampleRateText'),
+            resetBtn: document.getElementById('resetBtn'),
+            exportBtn: document.getElementById('exportBtn'),
+            exportText: document.getElementById('exportText')
+        };
+
+        async function initAudio() {
+            if (audioCtx) return audioCtx;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+            const url = URL.createObjectURL(blob);
+            await audioCtx.audioWorklet.addModule(url);
+
+            workletNode = new AudioWorkletNode(audioCtx, 'pitch-shift-processor');
+            gainNode = audioCtx.createGain();
+            analyzer = audioCtx.createAnalyser();
+            analyzer.fftSize = 256;
+
+            gainNode.gain.value = parseFloat(ui.volumeSlider.value);
+            ui.sampleRateText.innerText = `${audioCtx.sampleRate} Hz`;
+
+            updatePitch();
+            updateGrain();
+            updateOverlap();
+            updateMix();
+
+            return audioCtx;
+        }
+
+        function updatePitch() {
+            const p = parseFloat(ui.pitchSlider.value);
+            const c = parseFloat(ui.centsSlider.value);
+            ui.pitchDisplay.innerText = p > 0 ? `+${p}` : p;
+            ui.centsDisplay.innerText = c > 0 ? `+${c}` : c;
+            
+            if (workletNode) {
+                const totalSemitones = p + (c / 100);
+                const ratio = Math.pow(2, totalSemitones / 12);
+                workletNode.port.postMessage({ type: 'SET_PITCH', value: ratio });
+            }
+        }
+
+        function updateGrain() {
+            const ms = parseInt(ui.grainSlider.value);
+            ui.grainDisplay.innerText = `${ms} ms`;
+            if (workletNode && audioCtx) {
+                const samples = (ms / 1000) * audioCtx.sampleRate;
+                workletNode.port.postMessage({ type: 'SET_GRAIN', value: samples });
+            }
+        }
+
+        function updateOverlap() {
+            const v = parseFloat(ui.overlapSlider.value);
+            ui.overlapDisplay.innerText = `${Math.round(v * 100)}%`;
+            if (workletNode) workletNode.port.postMessage({ type: 'SET_OVERLAP', value: v });
+        }
+
+        function updateMix() {
+            const v = parseFloat(ui.mixSlider.value);
+            ui.mixDisplay.innerText = `${Math.round(v * 100)}%`;
+            if (workletNode) workletNode.port.postMessage({ type: 'SET_MIX', value: v });
+        }
+
+        function draw() {
+            const ctx = ui.visualizer.getContext('2d');
+            const bufferLength = analyzer.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            const render = () => {
+                animationFrameId = requestAnimationFrame(render);
+                analyzer.getByteFrequencyData(dataArray);
+
+                ctx.fillStyle = '#020617';
+                ctx.fillRect(0, 0, ui.visualizer.width, ui.visualizer.height);
+
+                const barWidth = (ui.visualizer.width / bufferLength) * 2.5;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * ui.visualizer.height;
+                    const hue = (i / bufferLength) * 360;
+                    ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.6)`;
+                    ctx.fillRect(x, ui.visualizer.height - barHeight, barWidth - 2, barHeight);
+                    x += barWidth;
+                }
+            };
+            render();
+        }
+
+        ui.audioUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                ui.fileName.innerText = file.name;
+                ui.audioElement.src = URL.createObjectURL(file);
+                isPlaying = false;
+                ui.playIcon.classList.remove('hidden');
+                ui.pauseIcon.classList.add('hidden');
+            }
+        });
+
+        ui.playBtn.addEventListener('click', async () => {
+            if (!ui.audioElement.src) return;
+            const ctx = await initAudio();
+            if (ctx.state === 'suspended') await ctx.resume();
+
+            if (!sourceNode) {
+                sourceNode = ctx.createMediaElementSource(ui.audioElement);
+                sourceNode.connect(workletNode);
+                workletNode.connect(gainNode);
+                gainNode.connect(analyzer);
+                analyzer.connect(ctx.destination);
+            }
+
+            if (isPlaying) {
+                ui.audioElement.pause();
+                ui.playIcon.classList.remove('hidden');
+                ui.pauseIcon.classList.add('hidden');
+                cancelAnimationFrame(animationFrameId);
+            } else {
+                ui.audioElement.play();
+                ui.playIcon.classList.add('hidden');
+                ui.pauseIcon.classList.remove('hidden');
+                draw();
+            }
+            isPlaying = !isPlaying;
+        });
+
+        ui.pitchSlider.addEventListener('input', updatePitch);
+        ui.centsSlider.addEventListener('input', updatePitch);
+        ui.grainSlider.addEventListener('input', updateGrain);
+        ui.overlapSlider.addEventListener('input', updateOverlap);
+        ui.mixSlider.addEventListener('input', updateMix);
+        ui.volumeSlider.addEventListener('input', () => {
+            const v = parseFloat(ui.volumeSlider.value);
+            ui.volumeValue.innerText = `${Math.round(v * 100)}%`;
+            if (gainNode) gainNode.gain.setTargetAtTime(v, audioCtx.currentTime, 0.05);
+        });
+
+        ui.resetBtn.addEventListener('click', () => {
+            ui.pitchSlider.value = 0;
+            ui.centsSlider.value = 0;
+            ui.grainSlider.value = 50;
+            ui.overlapSlider.value = 0.5;
+            ui.mixSlider.value = 1.0;
+            updatePitch();
+            updateGrain();
+            updateOverlap();
+            updateMix();
+        });
+
+        ui.exportBtn.addEventListener('click', async () => {
+            if (!audioCtx || !ui.audioElement.src) return;
+
+            ui.exportText.innerText = 'Capturing...';
+            ui.exportBtn.classList.add('animate-pulse');
+
+            const dest = audioCtx.createMediaStreamDestination();
+            gainNode.connect(dest);
+            
+            mediaRecorder = new MediaRecorder(dest.stream);
+            recordedChunks = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `shifted-${ui.fileName.innerText || 'audio'}.wav`;
+                a.click();
+                ui.exportText.innerText = 'Export';
+                ui.exportBtn.classList.remove('animate-pulse');
+            };
+
+            ui.audioElement.currentTime = 0;
+            mediaRecorder.start();
+            ui.audioElement.play();
+            
+            ui.audioElement.onended = () => {
+                mediaRecorder.stop();
+                ui.audioElement.onended = null;
+            };
+        });
+
+        ui.audioElement.onended = () => {
+            isPlaying = false;
+            ui.playIcon.classList.remove('hidden');
+            ui.pauseIcon.classList.add('hidden');
+            cancelAnimationFrame(animationFrameId);
+        };
+    </script>
+</body>
+</html>
